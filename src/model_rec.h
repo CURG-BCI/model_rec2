@@ -27,7 +27,8 @@ This class manages the interaction between the ros service, reading the kinect, 
 #include <vtkPoints.h>
 #include <vtkTransformPolyDataFilter.h>
 #include <list>
-#include  <ModelRec/FindObjects.h>
+#include  <model_rec/FindObjects.h>
+#include <Eigen/Geometry>
 
 class ModelRec
 {
@@ -44,7 +45,7 @@ public:
   
 private:  
   ros::NodeHandle *n_;
-  ros::ServiceServer *srv_recognizeScene;   
+  ros::ServiceServer srv_recognizeScene;   
   bool updateCloud();
   bool updatePCLPointCloud();
   bool beginUpdatePCLPointCloud();
@@ -74,11 +75,11 @@ private:
   boost::mutex ready_lock_;
   bool vtk_point_cloud_ready_;
   list<PointSetShape*> detected_shapes_;
-
+  
 
  public:
   ModelRec(ros::NodeHandle* n, std::string pcl_pointcloud_channel, double pair_width = 15.0, double voxel_size = 4.0);
 
 
-  bool runRecognitionCallback(const model_rec::FindObjects::Request & req, model_rec::FindObjects::Response & res);
+  bool runRecognitionCallback(model_rec::FindObjects::Request & req, model_rec::FindObjects::Response & res);
 };
