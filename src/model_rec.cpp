@@ -2,9 +2,12 @@
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 #include <pcl_ros/transforms.h>
+#include "/opt/ros/electric/stacks/perception_pcl/pcl/include/pcl-1.1/pcl/registration/transforms.h"
 #include <pcl_ros/filters/filter.h>
 #include <geometry_msgs/Pose.h>
 #include <eigen_conversions/eigen_msg.h>
+#include <sensor_msgs/PointCloud2.h>
+
 
 ModelRec::ModelRec(ros::NodeHandle* n, std::string pcl_pointcloud_channel, double pair_width, double voxel_size): n_(n), foreground_vtk_cloud_ptr_(vtkSmartPointer<vtkPoints>::New()), background_vtk_cloud_ptr_(vtkSmartPointer<vtkPoints>::New()), pcl_pointcloud_channel_(pcl_pointcloud_channel), max_cloud_queue_size(2), objrec_(pair_width, voxel_size, 0.5), success_probability_(0.99) 
 {
@@ -25,7 +28,8 @@ ModelRec::ModelRec(ros::NodeHandle* n, std::string pcl_pointcloud_channel, doubl
 /*@brief - Update internal pcl pointcloud by listening to point cloud stream
   
  */
-bool ModelRec::beginUpdatePCLPointCloud()
+bool
+ModelRec::beginUpdatePCLPointCloud()
 {
 
   ROS_INFO("Entering begin update\n");
@@ -36,7 +40,8 @@ bool ModelRec::beginUpdatePCLPointCloud()
 }
 
 
-void ModelRec::cloudQueuingCallback(const PointCloud::ConstPtr& msg)
+void
+ModelRec::cloudQueuingCallback(const PointCloud::ConstPtr& msg)
 {
   PointCloudPtr cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>);
   ROS_INFO("queuing cloud\n");
@@ -60,7 +65,8 @@ void ModelRec::cloudQueuingCallback(const PointCloud::ConstPtr& msg)
   
 }
 
-bool ModelRec::updatePCLPointCloud()
+bool
+ModelRec::updatePCLPointCloud()
 {
   ROS_INFO("concatenating cloud\n");
   pcl_point_cloud_->header.frame_id=cloud_queue[0]->header.frame_id;
@@ -155,7 +161,8 @@ ModelRec::removePlane( double plane_thickness, double rel_num_of_plane_points)
 	return true;
 }
 
-void eigenFromCArray(const double *in, Eigen::Affine3d &out){
+void
+eigenFromCArray(const double *in, Eigen::Affine3d &out){
   out(0,0) = in[0]; 
   out(0,1) = in[1];
   out(0,2) = in[2];
@@ -171,7 +178,8 @@ void eigenFromCArray(const double *in, Eigen::Affine3d &out){
 }
 
 
-bool ModelRec::runRecognitionCallback(model_rec::FindObjects::Request & req, model_rec::FindObjects::Response & res)
+bool
+ModelRec::runRecognitionCallback(model_rec::FindObjects::Request & req, model_rec::FindObjects::Response & res)
 {
   ROS_INFO("Entering callback\n");
   ready_lock_.lock();
@@ -201,14 +209,34 @@ bool ModelRec::runRecognitionCallback(model_rec::FindObjects::Request & req, mod
     const double *mat4x4 = shape->getRigidTransform();
     eigenFromCArray(mat4x4, shape_pose);
     tf::poseEigenToMsg(shape_pose, shape_pose_msg);
+    shape_pose_msg.position.x/=1000.0; shape_pose_msg.position.y/=1000.0; shape_pose_msg.position.z/=1000.0;
     std::cout << "Shape name " << shape->getUserData()->getLabel() << "\n"
 	      << "Transform " << shape_pose_msg << "\n";
     res.object_name.push_back(std::string(shape->getUserData()->getLabel()));
     res.object_pose.push_back(shape_pose_msg);
-    delete shape;  
+    PointCloudPtr pc = loadPointCloudFromPointShape(shape);
+    pc->header.frame_id = shape->getUserData()->getLabel();
+    sensor_msgs::PointCloud2 p;
+    pcl::toROSMsg(*pc, p);    
+    res.pointcloud.push_back(p);
+    delete shape;
   }
   detected_shapes_.clear();
 
   return true;
 }
 
+
+ModelRec::PointCloudPtr 
+ModelRec::loadPointCloudFromPointShape(PointSetShape * shape)
+{
+  PointCloudPtr new_cloud(new PointCloud());
+  vtkPointSet * pointset = shape->getPolyData();
+  for(vtkIdType id = 0; id < pointset->GetNumberOfPoints(); ++id)
+    {
+    double point_data[3];
+    pointset->GetPoint(id, point_data);
+    new_cloud->push_back(pcl::PointXYZ(point_data[0]/1000.0, point_data[1]/1000.0, point_data[2]/1000.0));
+    }
+  return new_cloud;
+}

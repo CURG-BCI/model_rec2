@@ -76,7 +76,7 @@ private:
   bool vtk_point_cloud_ready_;
   list<PointSetShape*> detected_shapes_;
   
-
+  PointCloudPtr loadPointCloudFromPointShape(PointSetShape * shape);
  public:
   ModelRec(ros::NodeHandle* n, std::string pcl_pointcloud_channel, double pair_width = 15.0, double voxel_size = 4.0);
 
