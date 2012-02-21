@@ -16,7 +16,7 @@ ModelRec::ModelRec(ros::NodeHandle* n, std::string pcl_pointcloud_channel, doubl
   model_list_.push_back("all");
   model_list_.push_back("garnier_shampoo_bottle");
   model_list_.push_back("gillette_shaving_gel");
-
+  model_list_.push_back("darpaflashlight");
 
   loadModels();
   objrec_.setVisibility(0.1);
@@ -231,7 +231,7 @@ ModelRec::PointCloudPtr
 ModelRec::loadPointCloudFromPointShape(PointSetShape * shape)
 {
   PointCloudPtr new_cloud(new PointCloud());
-  vtkPointSet * pointset = shape->getPolyData();
+  vtkPointSet * pointset = shape->getHighResModel();
   for(vtkIdType id = 0; id < pointset->GetNumberOfPoints(); ++id)
     {
     double point_data[3];
