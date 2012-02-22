@@ -136,22 +136,8 @@ bool ModelRec::updateVTKFromPCLCloud(){
   boost::lock_guard<boost::mutex> lock(ready_lock_);  
   PointCloudPtr scaled_cloud_ptr(new PointCloud);
   Eigen::Matrix4f transform;
-  /*Testing scaling models coming in instead of scaling input data -- this should be 
-    more efficient as it is only done once. Also, it ensures everything is being done
-    in meters - the consistency of which is nice to have. 
-  
 
-    transform.setIdentity();
-  transform(0,0) = 1000.0;
-  transform(1,1) = 1000.0;
-  transform(2,2) = 1000.0;
-
-  pcl::transformPointCloud<pcl::PointXYZ>(*pcl_point_cloud_,  *scaled_cloud_ptr, transform);
-
-  std::cout << "Cloud 2: " << (*scaled_cloud_ptr)[1].x << " "  <<(*scaled_cloud_ptr)[1].y << " " <<(*scaled_cloud_ptr)[1].z << std::endl;
-  pcl::visualization::PointCloudGeometryHandlerXYZ<pcl::PointXYZ> pgh(scaled_cloud_ptr);
-  */
-    pcl::visualization::PointCloudGeometryHandlerXYZ<pcl::PointXYZ> pgh(pcl_point_cloud_);
+  pcl::visualization::PointCloudGeometryHandlerXYZ<pcl::PointXYZ> pgh(pcl_point_cloud_);
   pgh.getGeometry(vtk_cloud_ptr_); 
   vtk_point_cloud_ready_ = true;
   return true;
@@ -307,12 +293,6 @@ ModelRec::runRecognitionCallback(model_rec::FindObjects::Request & req, model_re
     //such as Eigen::Transform or Eigen2something
     tf::poseEigenToMsg(shape_pose, shape_pose_msg);
 
-    //FIXME:This code has become obsolete - remove it
-    //Convert the position information to meters
-    //All messages passed between different parts of the code
-    //must use meters.
-    //    shape_pose_msg.position.x/=1000.0; shape_pose_msg.position.y/=1000.0; shape_pose_msg.position.z/=1000.0;
-
     //Print some basic information about detected shapes
     std::cout << "Shape name " << shape->getUserData()->getLabel() << "\n"
 	      << "Transform " << shape_pose_msg << "\n";
@@ -346,7 +326,7 @@ ModelRec::loadPointCloudFromPointShape(PointSetShape * shape)
     {
     double point_data[3];
     pointset->GetPoint(id, point_data);
-    new_cloud->push_back(pcl::PointXYZ(point_data[0]/1000.0, point_data[1]/1000.0, point_data[2]/1000.0));
+    new_cloud->push_back(pcl::PointXYZ(point_data[0], point_data[1], point_data[2]));
     }
   return new_cloud;
 }
