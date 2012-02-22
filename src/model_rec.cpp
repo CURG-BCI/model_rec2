@@ -7,17 +7,41 @@
 #include <geometry_msgs/Pose.h>
 #include <eigen_conversions/eigen_msg.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <pcl_ros/filters/statistical_outlier_removal.h>
+
+#include <VtkBasics/VtkWindow.h>
+#include <vtkPolyData.h>
+#include <vtkPolyDataReader.h>
+#include <vtkTransformPolyDataFilter.h>
+#include <VtkBasics/VtkPolyData.h>
+#include <VtkBasics/VtkPoints.h>
+#include <vtkPoints.h>
+
+#include <vtkTransform.h>
+#include <vtkTransformPolyDataFilter.h>
 
 
-ModelRec::ModelRec(ros::NodeHandle* n, std::string pcl_pointcloud_channel, double pair_width, double voxel_size): n_(n), foreground_vtk_cloud_ptr_(vtkSmartPointer<vtkPoints>::New()), background_vtk_cloud_ptr_(vtkSmartPointer<vtkPoints>::New()), pcl_pointcloud_channel_(pcl_pointcloud_channel), max_cloud_queue_size(2), objrec_(pair_width, voxel_size, 0.5), success_probability_(0.99) 
+
+#define HAO
+
+void visualize(list<PointSetShape*>& detectedShapes, vtkPoints* scene, vtkPoints* background);
+
+ModelRec::ModelRec(ros::NodeHandle* n, std::string pcl_pointcloud_channel, double pair_width, double voxel_size): n_(n), pcl_pointcloud_channel_(pcl_pointcloud_channel), max_cloud_queue_size(2), objrec_(pair_width, voxel_size, 0.5), success_probability_(0.99) 
 {
 
   srv_recognizeScene = n_->advertiseService("recognize_objects", &ModelRec::runRecognitionCallback, this);
+
   model_list_.push_back("all");
   model_list_.push_back("garnier_shampoo_bottle");
   model_list_.push_back("gillette_shaving_gel");
   model_list_.push_back("darpaflashlight");
 
+#ifdef HAO
+  model_list_.push_back("darpaphonehandset_1000");
+  model_list_.push_back("mug_custom2");
+  model_list_.push_back("drill_custom");
+#endif
+  
   loadModels();
   objrec_.setVisibility(0.1);
   objrec_.setRelativeObjectSize(0.1);
@@ -33,30 +57,56 @@ ModelRec::beginUpdatePCLPointCloud()
 {
 
   ROS_INFO("Entering begin update\n");
+  foreground_vtk_cloud_ptr_ = vtkSmartPointer<vtkPoints>::New();
+  background_vtk_cloud_ptr_ = vtkSmartPointer<vtkPoints>::New();
   cloud_queue.clear();
+  //  objrec_.clear_rec();  
   pcl_point_cloud_.reset(new PointCloud);
   pcl_pointcloud_sub_ = n_->subscribe<PointCloud>(pcl_pointcloud_channel_, 1, &ModelRec::cloudQueuingCallback, this);
   return true;
 }
 
+/*@brief - Callback function to preprocess and save a point 
+cloud from the point cloud stream for later processing. Unregister and 
+call next stage in processing when the correct number of point clouds has been found. 
+
+@param msg- Pointcloud message pointer from ROS.
+
+This function puts valid point clouds in the point cloud queue. The purpose of
+the point cloud queue is to super sample the scene. The number of samples
+is determined by the max_cloud_size member.
+
+FIXME: Test moving filtering functions out of this callback and in to the post capture
+processing. 
+
+ */
 
 void
 ModelRec::cloudQueuingCallback(const PointCloud::ConstPtr& msg)
 {
-  PointCloudPtr cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>);
+
+  PointCloudPtr cloud_NaN_filtered (new pcl::PointCloud<pcl::PointXYZ>), cloud_outlier_filtered (new pcl::PointCloud<pcl::PointXYZ>);
   ROS_INFO("queuing cloud\n");
-  std::cout <<" cloud message stats" << msg << std::endl;
-  //probably take a mutex here 
-  /*pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
-  sor.setInputCloud (msg);
+  
+  //Remove NaN from the cloud - it may be better to do this one the cloud is processed.
+  std::vector<int> indeces;  //UNUSED
+  pcl::removeNaNFromPointCloud (*msg, *cloud_NaN_filtered, indeces);
+
+  //Remove statistical outliers from the cloud. This will remove some of the stuff under the table and such.
+
+  /*This function looks at the standard deviation of the 50 nearest points. See PCL
+  documentation for details. 
+  Doing this after supersampling the point cloud will produce much more
+  aggressive filtering because it overlays so many points. 
+    */
+  pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
+  sor.setInputCloud (cloud_NaN_filtered);
   sor.setMeanK (50);
   sor.setStddevMulThresh (1.0);
-  sor.filter (*cloud_filtered);
-  */
-  std::vector<int> indeces;  
-  pcl::removeNaNFromPointCloud (*msg, *cloud_filtered, indeces);
-  cloud_queue.push_back(cloud_filtered);
-  std::cout << "Cloud " <<cloud_queue.size() << " : " << (*cloud_filtered)[1].x << " "  <<(*cloud_filtered)[1].y << " " <<(*cloud_filtered)[1].z << std::endl;
+  sor.filter (*cloud_outlier_filtered);
+  
+  cloud_queue.push_back(cloud_outlier_filtered);
+
   if (cloud_queue.size() == max_cloud_queue_size)
     {
       pcl_pointcloud_sub_.shutdown();
@@ -86,16 +136,22 @@ bool ModelRec::updateVTKFromPCLCloud(){
   boost::lock_guard<boost::mutex> lock(ready_lock_);  
   PointCloudPtr scaled_cloud_ptr(new PointCloud);
   Eigen::Matrix4f transform;
-  transform.setIdentity();
+  /*Testing scaling models coming in instead of scaling input data -- this should be 
+    more efficient as it is only done once. Also, it ensures everything is being done
+    in meters - the consistency of which is nice to have. 
+  
+
+    transform.setIdentity();
   transform(0,0) = 1000.0;
   transform(1,1) = 1000.0;
   transform(2,2) = 1000.0;
-    std::cout << "Cloud 1: " << (*pcl_point_cloud_)[1].x << " "  <<(*pcl_point_cloud_)[1].y << " " <<(*pcl_point_cloud_)[1].z << std::endl;
 
   pcl::transformPointCloud<pcl::PointXYZ>(*pcl_point_cloud_,  *scaled_cloud_ptr, transform);
 
   std::cout << "Cloud 2: " << (*scaled_cloud_ptr)[1].x << " "  <<(*scaled_cloud_ptr)[1].y << " " <<(*scaled_cloud_ptr)[1].z << std::endl;
   pcl::visualization::PointCloudGeometryHandlerXYZ<pcl::PointXYZ> pgh(scaled_cloud_ptr);
+  */
+    pcl::visualization::PointCloudGeometryHandlerXYZ<pcl::PointXYZ> pgh(pcl_point_cloud_);
   pgh.getGeometry(vtk_cloud_ptr_); 
   vtk_point_cloud_ready_ = true;
   return true;
@@ -111,6 +167,25 @@ ModelRec::updateCloud()
     updateVTKFromPCLCloud(); 
     ROS_INFO("returned from update vtk cloud\n");
     return true;
+}
+
+/*brief - helper function to scale vtk polydata meshes.
+
+  Default use to convert from millimeters to meters
+ */
+vtkSmartPointer<vtkPolyData> scale_vtk_model(vtkSmartPointer<vtkPolyData> & m, double scale = 1.0/1000.0)
+{
+  vtkSmartPointer<vtkTransform> transp = vtkSmartPointer<vtkTransform>::New();
+  transp->Scale(scale, scale, scale);
+  vtkSmartPointer<vtkTransformPolyDataFilter> tpd = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
+#if VTK_MAJOR_VERSION <= 5
+  tpd->SetInput(m);
+#else
+  tpd->SetInputData(m);
+#endif
+  tpd->SetTransform(transp);
+  tpd->Update();
+  return tpd->GetOutput();
 }
 
 
@@ -136,10 +211,13 @@ ModelRec::loadModels()
 	    reader->SetFileName(fileName);
 	    reader->Update();
 	    // Add the model to the model library
-	    objrec_.addModel(reader->GetOutput(), userData.get());
+	    vtkSmartPointer<vtkPolyData> model_data = reader->GetOutput();
+	    vtkSmartPointer<vtkPolyData> scaled_model_data = scale_vtk_model(model_data);
+	    objrec_.addModel(scaled_model_data, userData.get());
 	    // Save the user data and the reader in order to delete them later (outside this function)
 	    user_data_list_.push_back(userData);
 	    readers_.push_back(reader);
+	    scaled_shape_clouds_.push_back(scaled_model_data);
 	  }
 	return true;
 }
@@ -201,19 +279,51 @@ ModelRec::runRecognitionCallback(model_rec::FindObjects::Request & req, model_re
     ROS_INFO("Number of points: %i\n", vtk_cloud_ptr_->GetNumberOfPoints());
     objrec_.doRecognition(vtk_cloud_ptr_, success_probability_, detected_shapes_);
   }
+
+  
+  // visualize point clouds
+  //#ifdef VISUALIZE_POINT_CLOUDS
+  visualize(detected_shapes_, foreground_vtk_cloud_ptr_, background_vtk_cloud_ptr_);
+  //#endif
+
+
   ROS_INFO("Number of shapes: %i\n", detected_shapes_.size());
+
+  //process detected shapes and add them to response message
   BOOST_FOREACH(PointSetShape * shape, detected_shapes_){
+
+    //Transform linear shape matrix to pose message
+    //FIXME this could definitely be more elegant
     geometry_msgs::Pose shape_pose_msg;
     Eigen::Affine3d shape_pose;
     shape_pose.setIdentity();
     const double *mat4x4 = shape->getRigidTransform();
+    
+    //Stupid helper function to go from linear 4x4 to Eigen Affine3D
     eigenFromCArray(mat4x4, shape_pose);
+    //Stupid helper to go from eigen to pose message
+    //FIXME: WARNING - this api is not the one that was documented
+    //it may be deprecated in favor of a different Eigen structure
+    //such as Eigen::Transform or Eigen2something
     tf::poseEigenToMsg(shape_pose, shape_pose_msg);
-    shape_pose_msg.position.x/=1000.0; shape_pose_msg.position.y/=1000.0; shape_pose_msg.position.z/=1000.0;
+
+    //FIXME:This code has become obsolete - remove it
+    //Convert the position information to meters
+    //All messages passed between different parts of the code
+    //must use meters.
+    //    shape_pose_msg.position.x/=1000.0; shape_pose_msg.position.y/=1000.0; shape_pose_msg.position.z/=1000.0;
+
+    //Print some basic information about detected shapes
     std::cout << "Shape name " << shape->getUserData()->getLabel() << "\n"
 	      << "Transform " << shape_pose_msg << "\n";
+
+    //store the detected shapes and poses.
+    //FIXME - These should be bundled together in a "localized_object" structure
+    //instead of implicitly matching them by index in their relative vectors.
     res.object_name.push_back(std::string(shape->getUserData()->getLabel()));
     res.object_pose.push_back(shape_pose_msg);
+
+    //Get complete point cloud for matched object
     PointCloudPtr pc = loadPointCloudFromPointShape(shape);
     pc->header.frame_id = shape->getUserData()->getLabel();
     sensor_msgs::PointCloud2 p;
@@ -239,4 +349,91 @@ ModelRec::loadPointCloudFromPointShape(PointSetShape * shape)
     new_cloud->push_back(pcl::PointXYZ(point_data[0]/1000.0, point_data[1]/1000.0, point_data[2]/1000.0));
     }
   return new_cloud;
+}
+
+
+void visualize(list<PointSetShape*>& detectedShapes, vtkPoints* scene, vtkPoints* background)
+{
+	printf("Visualizing ...\n");
+
+	VtkWindow vtkwin(0, 0, 1000, 800);
+	  vtkwin.setCameraPosition(.131220071, -.240302073, -.162992888);
+	  vtkwin.setCameraFocalPoint(-.048026838, -.054679381, .787833180);
+	  vtkwin.setCameraViewUp(-0.044383, 0.978898, -0.199470);
+	  vtkwin.setCameraViewAngle(30.000000);
+	  vtkwin.setWindowSize(1000, 800);
+
+	list<VtkPolyData*> transformedModelList;
+
+	// Visualize the detected objects (important to look inside this loop)
+	for ( list<PointSetShape*>::iterator it = detectedShapes.begin() ; it != detectedShapes.end() ; ++it )
+	{
+		PointSetShape* shape = (*it);
+		// Which object do we have (and what confidence in the recognition result)
+		if ( shape->getUserData() )
+			printf("\t%s, confidence: %lf\n", shape->getUserData()->getLabel(), shape->getConfidence());
+
+		// Allocate memory for a homogeneous matrix
+		double **mat4x4 = mat_alloc(4, 4);
+		// Get the estimated rigid transform
+		shape->getHomogeneousRigidTransform(mat4x4);
+
+		const double *rigid_transform;
+		rigid_transform = shape->getRigidTransform();
+
+		std::cout << "Rotation Matrix: \n";
+		for (int i = 0; i < 3; ++i){
+			for (int j = 0; j < 3; ++j)
+			{
+				std::cout << rigid_transform[i*3+j] << ' ';
+			}
+			std::cout << "\n";
+		}
+		std::cout << "Translation: \n";
+		for (int i = 9; i < 12; ++i)
+			std::cout << rigid_transform[i] << ' ';
+		std::cout << std::endl;
+
+
+		// Transform the model instance using the estimated rigid transform
+		vtkTransformPolyDataFilter *transformer = vtkTransformPolyDataFilter::New();
+		  transformer->SetInput(shape->getHighResModel());
+		  VtkTransform::mat4x4ToTransformer((const double**)mat4x4, transformer);
+
+		// Visualize the transformed model
+		VtkPolyData* transformedModel = new VtkPolyData(transformer->GetOutput());
+		  transformedModel->setColor(1.0, 0.55, 0.05);
+		  vtkwin.addToRenderer(transformedModel->getActor());
+		  // Save in a list in order to delete outside this loop
+		  transformedModelList.push_back(transformedModel);
+
+		// Cleanup
+		mat_dealloc(mat4x4, 4);
+		transformer->Delete();
+	}
+
+	// Visualize the scene
+	VtkPoints scenePoints(scene);
+	  scenePoints.selfAdjustPointRadius();
+	  scenePoints.setColor(0.1, 0.5, 1.0);
+	  vtkwin.addToRenderer(scenePoints.getActor());
+
+	// Visualize the background
+	VtkPoints* backgroundPoints = NULL;
+	if ( background )
+	{
+		backgroundPoints = new VtkPoints(background);
+		backgroundPoints->selfAdjustPointRadius();
+		backgroundPoints->setColor(0.8, 0.8, 0.8);
+		vtkwin.addToRenderer(backgroundPoints->getActor());
+	}
+
+	// The main vtk loop
+	vtkwin.vtkMainLoop();
+
+	// Cleanup
+	for ( list<VtkPolyData*>::iterator it = transformedModelList.begin() ; it != transformedModelList.end() ; ++it )
+		delete *it;
+	if ( backgroundPoints )
+		delete backgroundPoints;
 }

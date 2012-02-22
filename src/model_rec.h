@@ -39,6 +39,7 @@ public:
   typedef PointCloud::ConstPtr PointCloudConstPtr;
   typedef boost::shared_ptr<UserData> UserDataPtr;
   typedef vtkSmartPointer<vtkPolyDataReader> vtkPolyDataReaderPtr;
+  typedef vtkSmartPointer<vtkPolyData> vtkPolyDataPtr;
   
   
 
@@ -64,7 +65,8 @@ private:
   void cloudQueuingCallback(const PointCloud::ConstPtr& msg);
   
   bool loadModels();
-  bool removePlane( double plane_thickness = 15.0, double rel_num_of_plane_points = 0.2)  ;
+  /*Plane thickness is in meters here */
+  bool removePlane( double plane_thickness = .015, double rel_num_of_plane_points = 0.2)  ;
      
   std::list<UserDataPtr> user_data_list_;
   std::list<vtkPolyDataReaderPtr> readers_;
@@ -74,11 +76,13 @@ private:
 
   boost::mutex ready_lock_;
   bool vtk_point_cloud_ready_;
-  list<PointSetShape*> detected_shapes_;
+  std::list<PointSetShape*> detected_shapes_;
+  std::list<vtkPolyDataPtr> scaled_shape_clouds_;
   
   PointCloudPtr loadPointCloudFromPointShape(PointSetShape * shape);
  public:
-  ModelRec(ros::NodeHandle* n, std::string pcl_pointcloud_channel, double pair_width = 15.0, double voxel_size = 4.0);
+  /*pair width and voxel size are in meters here */
+  ModelRec(ros::NodeHandle* n, std::string pcl_pointcloud_channel, double pair_width = .015, double voxel_size = .004);
 
 
   bool runRecognitionCallback(model_rec::FindObjects::Request & req, model_rec::FindObjects::Response & res);
