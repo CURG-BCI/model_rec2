@@ -2,7 +2,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 #include <pcl_ros/transforms.h>
-#include "/opt/ros/electric/stacks/perception_pcl/pcl/include/pcl-1.1/pcl/registration/transforms.h"
+#include <pcl/registration/transforms.h>
 #include <pcl_ros/filters/filter.h>
 #include <geometry_msgs/Pose.h>
 #include <eigen_conversions/eigen_msg.h>
@@ -22,7 +22,7 @@
 
 
 
-#define HAO
+//#define HAO
 
 void visualize(list<PointSetShape*>& detectedShapes, vtkPoints* scene, vtkPoints* background);
 
@@ -32,14 +32,28 @@ ModelRec::ModelRec(ros::NodeHandle* n, std::string pcl_pointcloud_channel, doubl
   srv_recognizeScene = n_->advertiseService("recognize_objects", &ModelRec::runRecognitionCallback, this);
 
   model_list_.push_back("all");
-  model_list_.push_back("garnier_shampoo_bottle");
-  model_list_.push_back("gillette_shaving_gel");
-  model_list_.push_back("darpaflashlight");
-
+        model_list_.push_back("garnier_shampoo_bottle");
+         model_list_.push_back("gillette_shaving_gel");
+     model_list_.push_back("darpaflashlight");
+  // model_list_.push_back("milk_carton");
+  
 #ifdef HAO
-  model_list_.push_back("darpaphonehandset_1000");
-  model_list_.push_back("mug_custom2");
-  model_list_.push_back("drill_custom");
+  model_list_.clear();
+  //model_list_.push_back("snapple");
+  //model_list_.push_back("box"); 
+  model_list_.push_back("all");
+  //model_list_.push_back("darparock");
+  //model_list_.push_back("library_cup");
+
+  //model_list_.push_back("gillette_shaving_gel");
+  //model_list_.push_back("garnier_shampoo_bottle");
+
+  //model_list_.push_back("darpaphonehandset_1000_different_coordinate_system");
+  //model_list_.push_back("mug_custom");
+  //model_list_.push_back("drill_custom");
+  //model_list_.push_back("darparock");
+  //model_list_.push_back("darpacanteen");
+  
 #endif
   
   loadModels();
@@ -115,18 +129,35 @@ ModelRec::cloudQueuingCallback(const PointCloud::ConstPtr& msg)
   
 }
 
+/*@brief - Concatenate stored pointclouds to make on big supersampled pointcloud of the scene. 
+
+This function takes the pointcloud2 messages stored by previous stages and concatenates them.
+It assumes that there are no incoming messages while it is working
+Also assumes a previous function has cleared the current combined point cloud
+
+FIXME - consider adding a lock here.
+
+FIXME - Consider doing post processing steps here.
+*/
+
+
 bool
 ModelRec::updatePCLPointCloud()
 {
   ROS_INFO("concatenating cloud\n");
+  //Set new pointcloud header. Pointclouds with different headers cannot be
+  //concatenated
   pcl_point_cloud_->header.frame_id=cloud_queue[0]->header.frame_id;
   int cloud_count = 0;
+
+  //Loop through existing pointclouds and concatenate them
   BOOST_FOREACH(PointCloudConstPtr ptr , cloud_queue)
     {
       ROS_INFO("adding cloud %i\n",cloud_count);
       cloud_count ++;
       (*pcl_point_cloud_) += (*ptr);
     }
+
   ROS_INFO("finished concatenating cloud\n");
   return true;
 }
@@ -243,7 +274,7 @@ eigenFromCArray(const double *in, Eigen::Affine3d &out){
 
 
 bool
-ModelRec::runRecognitionCallback(model_rec::FindObjects::Request & req, model_rec::FindObjects::Response & res)
+ModelRec::runRecognitionCallback(model_rec2::FindObjects::Request & req, model_rec2::FindObjects::Response & res)
 {
   ROS_INFO("Entering callback\n");
   ready_lock_.lock();
@@ -268,9 +299,9 @@ ModelRec::runRecognitionCallback(model_rec::FindObjects::Request & req, model_re
 
   
   // visualize point clouds
-  //#ifdef VISUALIZE_POINT_CLOUDS
+ #ifdef VISUALIZE_POINT_CLOUDS
   visualize(detected_shapes_, foreground_vtk_cloud_ptr_, background_vtk_cloud_ptr_);
-  //#endif
+ #endif
 
 
   ROS_INFO("Number of shapes: %i\n", detected_shapes_.size());

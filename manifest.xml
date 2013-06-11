@@ -1,0 +1,25 @@
+<package>
+  <description brief="A interface between ros point cloud publisher and object ransac library">
+    
+    modelrec2
+    
+  </description>
+  <author>Jon Weisz </author>
+  <license>PRIVATE</license>
+  <url>nonesense</url>
+  <review status="experimental" notes="beta"/>
+  <depend package="std_srvs" />
+  <depend package="geometry_msgs" />
+  <depend package="openni_launch" />
+  <depend package="roscpp" />
+  <depend package="sensor_msgs" />
+  <depend package="pcl" />
+  <depend package="pcl_ros" />
+  <depend package="tf_conversions" />
+  <depend package="eigen_conversions" />
+  <export>
+    <cpp cflags="-I${prefix}/msg_gen/cpp -I${prefix}/srv_gen/cpp"/>
+  </export>
+
+</package>
+  

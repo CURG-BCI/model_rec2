@@ -27,7 +27,7 @@ This class manages the interaction between the ros service, reading the kinect, 
 #include <vtkPoints.h>
 #include <vtkTransformPolyDataFilter.h>
 #include <list>
-#include  <model_rec/FindObjects.h>
+#include  <model_rec2/FindObjects.h>
 #include <Eigen/Geometry>
 
 class ModelRec
@@ -85,5 +85,5 @@ private:
   ModelRec(ros::NodeHandle* n, std::string pcl_pointcloud_channel, double pair_width = .015, double voxel_size = .004);
 
 
-  bool runRecognitionCallback(model_rec::FindObjects::Request & req, model_rec::FindObjects::Response & res);
+  bool runRecognitionCallback(model_rec2::FindObjects::Request & req, model_rec2::FindObjects::Response & res);
 };
