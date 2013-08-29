@@ -223,7 +223,7 @@ ModelRec::loadModels()
 	    UserDataPtr userData(new UserData());
 	    userData->setLabel(s.c_str());
 	    // Load the model
-	    sprintf(fileName, ("/home/armuser/ros/model_rec/Recognition/data/" + s + ".vtk").c_str());
+	    sprintf(fileName, ("/home/armuser/ros/rosbuild_src/model_rec/Recognition/data/" + s + ".vtk").c_str());
 	    vtkPolyDataReaderPtr reader(vtkPolyDataReader::New());
 	    reader->SetFileName(fileName);
 	    reader->Update();
