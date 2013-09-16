@@ -1,0 +1,6 @@
+models are  under 'data' directory
+
+source files are under 'src' directory
+
+'src/ObjRecRANSAC' contains the core algorithm of this program
+
