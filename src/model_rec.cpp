@@ -21,45 +21,29 @@
 #include <vtkTransformPolyDataFilter.h>
 
 
-
-//#define HAO
-
 void visualize(list<PointSetShape*>& detectedShapes, vtkPoints* scene, vtkPoints* background);
 
-ModelRec::ModelRec(ros::NodeHandle* n, std::string pcl_pointcloud_channel, double pair_width, double voxel_size): n_(n), pcl_pointcloud_channel_(pcl_pointcloud_channel), max_cloud_queue_size(2), objrec_(pair_width, voxel_size, 0.5), success_probability_(0.99) 
+ModelRec::ModelRec(ros::NodeHandle* n, std::string pcl_pointcloud_channel, double pair_width, double voxel_size): 
+  n_(n), 
+  pcl_pointcloud_channel_(pcl_pointcloud_channel), 
+  max_cloud_queue_size(2), 
+  objrec_(pair_width, voxel_size), 
+  success_probability_(0.99) 
 {
 
   srv_recognizeScene = n_->advertiseService("recognize_objects", &ModelRec::runRecognitionCallback, this);
-
+  // List of all models we want to be able to recognize. 
   model_list_.push_back("all");
-        model_list_.push_back("garnier_shampoo_bottle");
-         model_list_.push_back("gillette_shaving_gel");
-     model_list_.push_back("darpaflashlight");
-  // model_list_.push_back("milk_carton");
+  model_list_.push_back("garnier_shampoo_bottle");
+  model_list_.push_back("gillette_shaving_gel");
+  model_list_.push_back("darpaflashlight");
   
-#ifdef HAO
-  model_list_.clear();
-  //model_list_.push_back("snapple");
-  //model_list_.push_back("box"); 
-  model_list_.push_back("all");
-  //model_list_.push_back("darparock");
-  //model_list_.push_back("library_cup");
-
-  //model_list_.push_back("gillette_shaving_gel");
-  //model_list_.push_back("garnier_shampoo_bottle");
-
-  //model_list_.push_back("darpaphonehandset_1000_different_coordinate_system");
-  //model_list_.push_back("mug_custom");
-  //model_list_.push_back("drill_custom");
-  //model_list_.push_back("darparock");
-  //model_list_.push_back("darpacanteen");
-  
-#endif
   
   loadModels();
-  objrec_.setVisibility(0.1);
-  objrec_.setRelativeObjectSize(0.1);
-  objrec_.setNumberOfThreads(4);  
+  //Not exposed anymore. Let's assume that PCL and Radu made good choices.
+  //objrec_.setVisibility(0.1);
+  //objrec_.setRelativeObjectSize(0.1);
+  //objrec_.setNumberOfThreads(4);  
 }
 
 
@@ -230,7 +214,28 @@ ModelRec::loadModels()
 	    // Add the model to the model library
 	    vtkSmartPointer<vtkPolyData> model_data = reader->GetOutput();
 	    vtkSmartPointer<vtkPolyData> scaled_model_data = scale_vtk_model(model_data);
-	    objrec_.addModel(scaled_model_data, userData.get());
+	    //VTK data to pcl
+	    pcl::PolygonMesh::Ptr newMesh(new pcl::PolygonMesh);
+	    pcl::PointCloudXYZ::Ptr newPointcloud(new pcl::PointCloudXYZ);
+	    
+	    
+
+	    pcl::VTKUtils::vtk2mesh(scaled_model_data,*newMesh);
+	    // This is kind of dumb, but for now we will do the simplest normal estimation as per:
+	    // http://pointclouds.org/documentation/tutorials/normal_estimation.php#normal-estimation
+	    // This may lead to some normals pointed the wrong way. 
+	    //We will have to address this later.
+	    pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
+	    pcl::PointCloud<pcl::Normal>::Ptr normals (new pcl::PointCloud<pcl::Normal>);
+	    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
+	    tree->setInputCloud (newPointcloud);
+	    ne.setSearchMethod(tree);
+	    ne->setInputCloud (newPointcloud);
+	    ne.setKSearch (20);
+	    ne.compute(*normals);
+	    
+
+	    objrec_.addModel(newPointCloud, normals, userData.get());
 	    // Save the user data and the reader in order to delete them later (outside this function)
 	    user_data_list_.push_back(userData);
 	    readers_.push_back(reader);
