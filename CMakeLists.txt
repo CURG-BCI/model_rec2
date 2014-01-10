@@ -11,7 +11,7 @@ rosbuild_add_boost_directories ()
 rosbuild_gensrv()
 
 find_package(VTK)
-
+find_package(PCL 1.7 REQUIRED)
 IF(NOT VTK_FOUND)
   message(FATAL_ERROR "VTK not found. VTK is not installed or cmake can not find it. Install VTK first and then try again.
 If VTK is installed but cmake can not find it, set the VTK_DIR entry to the folder which contains the file VTKConfig.cmake")
@@ -29,9 +29,12 @@ add_subdirectory(./Recognition)
 include_directories(
 	${VTK_INCLUDE_DIRS}
 	${OpenCV_INCLUDE_DIRS}
+	${PCL_INCLUDE_DIRS}
 	./src
 	./Recognition/src
 )
+
+message("PCL include dirs ${PCL_INCLUDE_DIRS}")
 
 link_directories(
 	${VTK_LIBRARY_DIRS}
@@ -41,10 +44,10 @@ link_directories(
 if(CMAKE_COMPILER_IS_GNUCXX)
     set(CMAKE_CXX_FLAGS "-Wno-deprecated -mfpmath=sse -msse -msse2 -msse3 -mssse3 -msse4.1 -O3")
 endif()
-
+#Wrapper around library
 rosbuild_add_library(ModelRec src/model_rec.cpp)
-
+#executable with ros loop
 rosbuild_add_executable(ObjRecRANSACRun src/model_rec_server.cpp)
-target_link_libraries(ObjRecRANSACRun ModelRec ObjRecRANSAC BasicToolsL1 BasicTools VtkBasics vtkCommon vtkRendering ${OpenCV_LIBS})
+target_link_libraries(ObjRecRANSACRun ModelRec ObjRecRANSAC BasicToolsL1 BasicTools VtkBasics vtkCommon vtkRendering ${OpenCV_LIBS} ${PCL_LIBS})
 
 

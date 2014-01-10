@@ -13,7 +13,7 @@
   <depend package="openni_launch" />
   <depend package="roscpp" />
   <depend package="sensor_msgs" />
-  <depend package="pcl" />
+
   <depend package="pcl_ros" />
   <depend package="tf_conversions" />
   <depend package="eigen_conversions" />
