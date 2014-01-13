@@ -1,17 +1,16 @@
 
 cmake_minimum_required(VERSION 2.6)
-include ($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
-
+project(model_rec2)
 set(CMAKE_VERBOSE_MAKEFILE ON)
-set (ROS_BUILD_TYPE Release)
-#set (ROS_BUILD_TYPE RelWithDebInfo)
+
 add_definitions(-DEIGEN2_SUPPORT)
-rosbuild_init ()
-rosbuild_add_boost_directories ()
-rosbuild_gensrv()
+
+find_package(catkin REQUIRED COMPONENTS std_msgs geometry_msgs sensor_msgs message_generation)
+find_package(Boost REQUIRED COMPONENTS thread)
+
 
 find_package(VTK)
-find_package(PCL 1.7 REQUIRED)
+find_package(PCL 1.6 REQUIRED)
 IF(NOT VTK_FOUND)
   message(FATAL_ERROR "VTK not found. VTK is not installed or cmake can not find it. Install VTK first and then try again.
 If VTK is installed but cmake can not find it, set the VTK_DIR entry to the folder which contains the file VTKConfig.cmake")
@@ -36,18 +35,30 @@ include_directories(
 
 message("PCL include dirs ${PCL_INCLUDE_DIRS}")
 
+
+add_service_files(FILES FindObjects.srv)
+generate_messages(
+	DEPENDENCIES
+	geometry_msgs
+	sensor_msgs)
+
+catkin_package(DEPENDS Boost)
+
+
+
 link_directories(
 	${VTK_LIBRARY_DIRS}
 	${OpenCV_LIB_DIR}
 )
 
+
 if(CMAKE_COMPILER_IS_GNUCXX)
     set(CMAKE_CXX_FLAGS "-Wno-deprecated -mfpmath=sse -msse -msse2 -msse3 -mssse3 -msse4.1 -O3")
 endif()
 #Wrapper around library
-rosbuild_add_library(ModelRec src/model_rec.cpp)
+add_library(ModelRec src/model_rec.cpp)
 #executable with ros loop
-rosbuild_add_executable(ObjRecRANSACRun src/model_rec_server.cpp)
+add_executable(ObjRecRANSACRun src/model_rec_server.cpp)
 target_link_libraries(ObjRecRANSACRun ModelRec ObjRecRANSAC BasicToolsL1 BasicTools VtkBasics vtkCommon vtkRendering ${OpenCV_LIBS} ${PCL_LIBS})
 
 

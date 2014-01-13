@@ -1,0 +1,32 @@
+<package>
+  <name>model_rec2</name>
+  <version>1.0.0</version>
+  <description>
+	A interface between ros point cloud publisher and object ransac library
+  </description>
+  <maintainer email="jvarley@cs.columbia.edu">Jake Varley</maintainer>
+  <maintainer email= "none@gmail.com">Jon Weisz</maintainer>
+
+  <author>Jon Weisz </author>
+  <license>PRIVATE</license>
+  <url>nonesense</url>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>message_generation</build_depend>
+ <build_depend>message_runtime</build_depend>
+  <build_depend>std_srvs</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>openni_launch</build_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>pcl_ros</build_depend>
+  <build_depend>tf_conversions</build_depend>
+  <build_depend>eigen_conversions</build_depend>
+
+  <export>
+    <cpp cflags="-I${prefix}/msg_gen/cpp -I${prefix}/srv_gen/cpp"/>
+  </export>
+
+</package>
+  
