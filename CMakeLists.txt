@@ -5,7 +5,7 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 
 add_definitions(-DEIGEN2_SUPPORT)
 
-find_package(catkin REQUIRED COMPONENTS std_msgs geometry_msgs sensor_msgs message_generation)
+find_package(catkin REQUIRED COMPONENTS std_msgs geometry_msgs sensor_msgs message_generation roscpp roslib)
 find_package(Boost REQUIRED COMPONENTS thread)
 
 
@@ -29,22 +29,29 @@ include_directories(
 	${VTK_INCLUDE_DIRS}
 	${OpenCV_INCLUDE_DIRS}
 	${PCL_INCLUDE_DIRS}
-        ./srv
+    ${catkin_INCLUDE_DIRS}
+    ./srv
 	./src
 	./Recognition/src
 )
 
+
 message("PCL include dirs ${PCL_INCLUDE_DIRS}")
 
 
-add_service_files(FILES FindObjects.srv)
+add_service_files(
+	FILES FindObjects.srv
+)
+
 generate_messages(
 	DEPENDENCIES
 	geometry_msgs
-	sensor_msgs)
+	sensor_msgs
+)
 
 catkin_package(DEPENDS Boost
-    CATKIN_DEPENDS message_runtime)
+    CATKIN_DEPENDS message_runtime roscpp message_generation roslib
+)
 
 
 
@@ -59,8 +66,13 @@ if(CMAKE_COMPILER_IS_GNUCXX)
 endif()
 #Wrapper around library
 add_library(ModelRec src/model_rec.cpp)
+add_dependencies(ModelRec model_rec2_generate_messages_cpp roscpp)
+
 #executable with ros loop
 add_executable(ObjRecRANSACRun src/model_rec_server.cpp)
-target_link_libraries(ObjRecRANSACRun ModelRec ObjRecRANSAC BasicToolsL1 BasicTools VtkBasics vtkCommon vtkRendering ${OpenCV_LIBS} ${PCL_LIBS})
+
+target_link_libraries(ObjRecRANSACRun ModelRec ObjRecRANSAC BasicToolsL1 BasicTools VtkBasics vtkCommon vtkRendering ${OpenCV_LIBS} ${PCL_LIBS} ${catkin_LIBRARIES})
+
+
 
 
