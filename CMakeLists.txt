@@ -10,7 +10,7 @@ find_package(Boost REQUIRED COMPONENTS thread)
 
 
 find_package(VTK)
-find_package(PCL 1.6 REQUIRED)
+find_package(PCL 1.7 REQUIRED)
 IF(NOT VTK_FOUND)
   message(FATAL_ERROR "VTK not found. VTK is not installed or cmake can not find it. Install VTK first and then try again.
 If VTK is installed but cmake can not find it, set the VTK_DIR entry to the folder which contains the file VTKConfig.cmake")
@@ -29,6 +29,7 @@ include_directories(
 	${VTK_INCLUDE_DIRS}
 	${OpenCV_INCLUDE_DIRS}
 	${PCL_INCLUDE_DIRS}
+        ./srv
 	./src
 	./Recognition/src
 )
@@ -42,7 +43,8 @@ generate_messages(
 	geometry_msgs
 	sensor_msgs)
 
-catkin_package(DEPENDS Boost)
+catkin_package(DEPENDS Boost
+    CATKIN_DEPENDS message_runtime)
 
 
 

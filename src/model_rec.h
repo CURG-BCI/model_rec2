@@ -27,7 +27,7 @@ This class manages the interaction between the ros service, reading the kinect, 
 #include <vtkPoints.h>
 #include <vtkTransformPolyDataFilter.h>
 #include <list>
-#include  <model_rec2/FindObjects.h>
+#include <model_rec2/FindObjects.h>
 #include <Eigen/Geometry>
 #include <pcl/recognition/obj_rec_ransac.h>
 
