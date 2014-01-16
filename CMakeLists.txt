@@ -14,7 +14,6 @@ find_package(catkin REQUIRED COMPONENTS
 	sensor_msgs 
 	message_generation 
 	roscpp 
-	roslib
 	pcl
 	pcl_ros
 	eigen_conversions)
@@ -80,7 +79,8 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES my_pcl_tutorial
-   CATKIN_DEPENDS message_runtime roscpp message_generation roslib tf pcl geometry_msgs tf_conversions eigen_conversions
+#   CATKIN_DEPENDS message_runtime roscpp message_generation roslib pcl geometry_msgs eigen_conversions
+#   CATKIN_DEPENDS message_runtime roscpp message_generation pcl geometry_msgs eigen_conversions
 #  DEPENDS system_lib
 )
 
@@ -120,7 +120,7 @@ add_executable(ObjRecRANSACRun src/model_rec_server.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
-add_dependencies(ModelRec model_rec2_generate_messages_cpp roscpp tf tf_conversions eigen_conversions)
+#add_dependencies(ModelRec model_rec2_generate_messages_cpp roscpp eigen_conversions)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(ModelRec ${PCL_LIBS} ${catkin_LIBRARIES})
