@@ -21,29 +21,45 @@
 #include <vtkTransformPolyDataFilter.h>
 
 
+
+//#define HAO
+
 void visualize(list<PointSetShape*>& detectedShapes, vtkPoints* scene, vtkPoints* background);
 
-ModelRec::ModelRec(ros::NodeHandle* n, std::string pcl_pointcloud_channel, double pair_width, double voxel_size): 
-  n_(n), 
-  pcl_pointcloud_channel_(pcl_pointcloud_channel), 
-  max_cloud_queue_size(2), 
-  objrec_(pair_width, voxel_size), 
-  success_probability_(0.99) 
+ModelRec::ModelRec(ros::NodeHandle* n, std::string pcl_pointcloud_channel, double pair_width, double voxel_size): n_(n), pcl_pointcloud_channel_(pcl_pointcloud_channel), max_cloud_queue_size(2), objrec_(pair_width, voxel_size, 0.5), success_probability_(0.99) 
 {
 
   srv_recognizeScene = n_->advertiseService("recognize_objects", &ModelRec::runRecognitionCallback, this);
-  // List of all models we want to be able to recognize. 
+
   model_list_.push_back("all");
-  model_list_.push_back("garnier_shampoo_bottle");
-  model_list_.push_back("gillette_shaving_gel");
-  model_list_.push_back("darpaflashlight");
+        model_list_.push_back("garnier_shampoo_bottle");
+         model_list_.push_back("gillette_shaving_gel");
+     model_list_.push_back("darpaflashlight");
+  // model_list_.push_back("milk_carton");
   
+#ifdef HAO
+  model_list_.clear();
+  //model_list_.push_back("snapple");
+  //model_list_.push_back("box"); 
+  model_list_.push_back("all");
+  //model_list_.push_back("darparock");
+  //model_list_.push_back("library_cup");
+
+  //model_list_.push_back("gillette_shaving_gel");
+  //model_list_.push_back("garnier_shampoo_bottle");
+
+  //model_list_.push_back("darpaphonehandset_1000_different_coordinate_system");
+  //model_list_.push_back("mug_custom");
+  //model_list_.push_back("drill_custom");
+  //model_list_.push_back("darparock");
+  //model_list_.push_back("darpacanteen");
+  
+#endif
   
   loadModels();
-  //Not exposed anymore. Let's assume that PCL and Radu made good choices.
-  //objrec_.setVisibility(0.1);
-  //objrec_.setRelativeObjectSize(0.1);
-  //objrec_.setNumberOfThreads(4);  
+  objrec_.setVisibility(0.1);
+  objrec_.setRelativeObjectSize(0.1);
+  objrec_.setNumberOfThreads(4);  
 }
 
 
@@ -193,72 +209,51 @@ vtkSmartPointer<vtkPolyData> scale_vtk_model(vtkSmartPointer<vtkPolyData> & m, d
 bool
 ModelRec::loadModels()
 {
-	char fileName[1024];
-	// Derive the class 'UserData' if you want to save some specific information
-	// about each model. When you load a model in the library you have to pass a 'UserData'-pointer
-	// to the method 'addModel()'. If the corresponding model is detected in the scene, you can use
-	// the 'UserData'-pointer which is returned by the recognition method, in order to know which
-	// model has been detected.
+        char fileName[1024];
+        // Derive the class 'UserData' if you want to save some specific information
+        // about each model. When you load a model in the library you have to pass a 'UserData'-pointer
+        // to the method 'addModel()'. If the corresponding model is detected in the scene, you can use
+        // the 'UserData'-pointer which is returned by the recognition method, in order to know which
+        // model has been detected.
 
-	BOOST_FOREACH(std::string s, model_list_)
-	  {
+        BOOST_FOREACH(std::string s, model_list_)
+          {
 
-	    // Create a user object
-	    UserDataPtr userData(new UserData());
-	    userData->setLabel(s.c_str());
-	    // Load the model
-	    sprintf(fileName, ("/home/armuser/ros/rosbuild_src/model_rec/Recognition/data/" + s + ".vtk").c_str());
-	    vtkPolyDataReaderPtr reader(vtkPolyDataReader::New());
-	    reader->SetFileName(fileName);
-	    reader->Update();
-	    // Add the model to the model library
-	    vtkSmartPointer<vtkPolyData> model_data = reader->GetOutput();
-	    vtkSmartPointer<vtkPolyData> scaled_model_data = scale_vtk_model(model_data);
-	    //VTK data to pcl
-	    pcl::PolygonMesh::Ptr newMesh(new pcl::PolygonMesh);
-	    pcl::PointCloudXYZ::Ptr newPointcloud(new pcl::PointCloudXYZ);
-	    
-	    
-
-	    pcl::VTKUtils::vtk2mesh(scaled_model_data,*newMesh);
-	    // This is kind of dumb, but for now we will do the simplest normal estimation as per:
-	    // http://pointclouds.org/documentation/tutorials/normal_estimation.php#normal-estimation
-	    // This may lead to some normals pointed the wrong way. 
-	    //We will have to address this later.
-	    pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
-	    pcl::PointCloud<pcl::Normal>::Ptr normals (new pcl::PointCloud<pcl::Normal>);
-	    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
-	    tree->setInputCloud (newPointcloud);
-	    ne.setSearchMethod(tree);
-	    ne->setInputCloud (newPointcloud);
-	    ne.setKSearch (20);
-	    ne.compute(*normals);
-	    
-
-	    objrec_.addModel(newPointCloud, normals, userData.get());
-	    // Save the user data and the reader in order to delete them later (outside this function)
-	    user_data_list_.push_back(userData);
-	    readers_.push_back(reader);
-	    scaled_shape_clouds_.push_back(scaled_model_data);
-	  }
-	return true;
+            // Create a user object
+            UserDataPtr userData(new UserData());
+            userData->setLabel(s.c_str());
+            // Load the model
+            sprintf(fileName, ("/home/armuser/ros/rosbuild_src/model_rec/Recognition/data/" + s + ".vtk").c_str());
+            vtkPolyDataReaderPtr reader(vtkPolyDataReader::New());
+            reader->SetFileName(fileName);
+            reader->Update();
+            // Add the model to the model library
+            vtkSmartPointer<vtkPolyData> model_data = reader->GetOutput();
+            vtkSmartPointer<vtkPolyData> scaled_model_data = scale_vtk_model(model_data);
+            objrec_.addModel(scaled_model_data, userData.get());
+            // Save the user data and the reader in order to delete them later (outside this function)
+            user_data_list_.push_back(userData);
+            readers_.push_back(reader);
+            scaled_shape_clouds_.push_back(scaled_model_data);
+          }
+        return true;
 }
 
 
 bool 
 ModelRec::removePlane( double plane_thickness, double rel_num_of_plane_points)  
 {
-	RANSACPlaneDetector plane_detector;
-	// Perform the plane detection
-	plane_detector.detectPlane(vtk_cloud_ptr_, rel_num_of_plane_points, plane_thickness);
-	// Check the orientation of the detected plane normal
-	if ( plane_detector.getPlaneNormal()[2] > 0.0 )
-		plane_detector.flipPlaneNormal();
-	// Get the points above the plane (the scene) and the ones below it (background)
-	plane_detector.getPointsAbovePlane(foreground_vtk_cloud_ptr_, background_vtk_cloud_ptr_);
-	ROS_INFO("Number of foreground points: %i\n", foreground_vtk_cloud_ptr_->GetNumberOfPoints());
-	ROS_INFO("Number of background points: %i\n", background_vtk_cloud_ptr_->GetNumberOfPoints());
-	return true;
+        RANSACPlaneDetector plane_detector;
+        // Perform the plane detection
+        plane_detector.detectPlane(vtk_cloud_ptr_, rel_num_of_plane_points, plane_thickness);
+        // Check the orientation of the detected plane normal
+        if ( plane_detector.getPlaneNormal()[2] > 0.0 )
+                plane_detector.flipPlaneNormal();
+        // Get the points above the plane (the scene) and the ones below it (background)
+        plane_detector.getPointsAbovePlane(foreground_vtk_cloud_ptr_, background_vtk_cloud_ptr_);
+        ROS_INFO("Number of foreground points: %i\n", foreground_vtk_cloud_ptr_->GetNumberOfPoints());
+        ROS_INFO("Number of background points: %i\n", background_vtk_cloud_ptr_->GetNumberOfPoints());
+        return true;
 }
 
 void
@@ -331,7 +326,7 @@ ModelRec::runRecognitionCallback(model_rec2::FindObjects::Request & req, model_r
 
     //Print some basic information about detected shapes
     std::cout << "Shape name " << shape->getUserData()->getLabel() << "\n"
-	      << "Transform " << shape_pose_msg << "\n";
+              << "Transform " << shape_pose_msg << "\n";
 
     //store the detected shapes and poses.
     //FIXME - These should be bundled together in a "localized_object" structure
@@ -370,86 +365,86 @@ ModelRec::loadPointCloudFromPointShape(PointSetShape * shape)
 
 void visualize(list<PointSetShape*>& detectedShapes, vtkPoints* scene, vtkPoints* background)
 {
-	printf("Visualizing ...\n");
+        printf("Visualizing ...\n");
 
-	VtkWindow vtkwin(0, 0, 1000, 800);
-	  vtkwin.setCameraPosition(.131220071, -.240302073, -.162992888);
-	  vtkwin.setCameraFocalPoint(-.048026838, -.054679381, .787833180);
-	  vtkwin.setCameraViewUp(-0.044383, 0.978898, -0.199470);
-	  vtkwin.setCameraViewAngle(30.000000);
-	  vtkwin.setWindowSize(1000, 800);
+        VtkWindow vtkwin(0, 0, 1000, 800);
+          vtkwin.setCameraPosition(.131220071, -.240302073, -.162992888);
+          vtkwin.setCameraFocalPoint(-.048026838, -.054679381, .787833180);
+          vtkwin.setCameraViewUp(-0.044383, 0.978898, -0.199470);
+          vtkwin.setCameraViewAngle(30.000000);
+          vtkwin.setWindowSize(1000, 800);
 
-	list<VtkPolyData*> transformedModelList;
+        list<VtkPolyData*> transformedModelList;
 
-	// Visualize the detected objects (important to look inside this loop)
-	for ( list<PointSetShape*>::iterator it = detectedShapes.begin() ; it != detectedShapes.end() ; ++it )
-	{
-		PointSetShape* shape = (*it);
-		// Which object do we have (and what confidence in the recognition result)
-		if ( shape->getUserData() )
-			printf("\t%s, confidence: %lf\n", shape->getUserData()->getLabel(), shape->getConfidence());
+        // Visualize the detected objects (important to look inside this loop)
+        for ( list<PointSetShape*>::iterator it = detectedShapes.begin() ; it != detectedShapes.end() ; ++it )
+        {
+                PointSetShape* shape = (*it);
+                // Which object do we have (and what confidence in the recognition result)
+                if ( shape->getUserData() )
+                        printf("\t%s, confidence: %lf\n", shape->getUserData()->getLabel(), shape->getConfidence());
 
-		// Allocate memory for a homogeneous matrix
-		double **mat4x4 = mat_alloc(4, 4);
-		// Get the estimated rigid transform
-		shape->getHomogeneousRigidTransform(mat4x4);
+                // Allocate memory for a homogeneous matrix
+                double **mat4x4 = mat_alloc(4, 4);
+                // Get the estimated rigid transform
+                shape->getHomogeneousRigidTransform(mat4x4);
 
-		const double *rigid_transform;
-		rigid_transform = shape->getRigidTransform();
+                const double *rigid_transform;
+                rigid_transform = shape->getRigidTransform();
 
-		std::cout << "Rotation Matrix: \n";
-		for (int i = 0; i < 3; ++i){
-			for (int j = 0; j < 3; ++j)
-			{
-				std::cout << rigid_transform[i*3+j] << ' ';
-			}
-			std::cout << "\n";
-		}
-		std::cout << "Translation: \n";
-		for (int i = 9; i < 12; ++i)
-			std::cout << rigid_transform[i] << ' ';
-		std::cout << std::endl;
+                std::cout << "Rotation Matrix: \n";
+                for (int i = 0; i < 3; ++i){
+                        for (int j = 0; j < 3; ++j)
+                        {
+                                std::cout << rigid_transform[i*3+j] << ' ';
+                        }
+                        std::cout << "\n";
+                }
+                std::cout << "Translation: \n";
+                for (int i = 9; i < 12; ++i)
+                        std::cout << rigid_transform[i] << ' ';
+                std::cout << std::endl;
 
 
-		// Transform the model instance using the estimated rigid transform
-		vtkTransformPolyDataFilter *transformer = vtkTransformPolyDataFilter::New();
-		  transformer->SetInput(shape->getHighResModel());
-		  VtkTransform::mat4x4ToTransformer((const double**)mat4x4, transformer);
+                // Transform the model instance using the estimated rigid transform
+                vtkTransformPolyDataFilter *transformer = vtkTransformPolyDataFilter::New();
+                  transformer->SetInput(shape->getHighResModel());
+                  VtkTransform::mat4x4ToTransformer((const double**)mat4x4, transformer);
 
-		// Visualize the transformed model
-		VtkPolyData* transformedModel = new VtkPolyData(transformer->GetOutput());
-		  transformedModel->setColor(1.0, 0.55, 0.05);
-		  vtkwin.addToRenderer(transformedModel->getActor());
-		  // Save in a list in order to delete outside this loop
-		  transformedModelList.push_back(transformedModel);
+                // Visualize the transformed model
+                VtkPolyData* transformedModel = new VtkPolyData(transformer->GetOutput());
+                  transformedModel->setColor(1.0, 0.55, 0.05);
+                  vtkwin.addToRenderer(transformedModel->getActor());
+                  // Save in a list in order to delete outside this loop
+                  transformedModelList.push_back(transformedModel);
 
-		// Cleanup
-		mat_dealloc(mat4x4, 4);
-		transformer->Delete();
-	}
+                // Cleanup
+                mat_dealloc(mat4x4, 4);
+                transformer->Delete();
+        }
 
-	// Visualize the scene
-	VtkPoints scenePoints(scene);
-	  scenePoints.selfAdjustPointRadius();
-	  scenePoints.setColor(0.1, 0.5, 1.0);
-	  vtkwin.addToRenderer(scenePoints.getActor());
+        // Visualize the scene
+        VtkPoints scenePoints(scene);
+          scenePoints.selfAdjustPointRadius();
+          scenePoints.setColor(0.1, 0.5, 1.0);
+          vtkwin.addToRenderer(scenePoints.getActor());
 
-	// Visualize the background
-	VtkPoints* backgroundPoints = NULL;
-	if ( background )
-	{
-		backgroundPoints = new VtkPoints(background);
-		backgroundPoints->selfAdjustPointRadius();
-		backgroundPoints->setColor(0.8, 0.8, 0.8);
-		vtkwin.addToRenderer(backgroundPoints->getActor());
-	}
+        // Visualize the background
+        VtkPoints* backgroundPoints = NULL;
+        if ( background )
+        {
+                backgroundPoints = new VtkPoints(background);
+                backgroundPoints->selfAdjustPointRadius();
+                backgroundPoints->setColor(0.8, 0.8, 0.8);
+                vtkwin.addToRenderer(backgroundPoints->getActor());
+        }
 
-	// The main vtk loop
-	vtkwin.vtkMainLoop();
+        // The main vtk loop
+        vtkwin.vtkMainLoop();
 
-	// Cleanup
-	for ( list<VtkPolyData*>::iterator it = transformedModelList.begin() ; it != transformedModelList.end() ; ++it )
-		delete *it;
-	if ( backgroundPoints )
-		delete backgroundPoints;
+        // Cleanup
+        for ( list<VtkPolyData*>::iterator it = transformedModelList.begin() ; it != transformedModelList.end() ; ++it )
+                delete *it;
+        if ( backgroundPoints )
+                delete backgroundPoints;
 }

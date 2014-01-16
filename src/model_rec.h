@@ -27,9 +27,8 @@ This class manages the interaction between the ros service, reading the kinect, 
 #include <vtkPoints.h>
 #include <vtkTransformPolyDataFilter.h>
 #include <list>
-#include <model_rec2/FindObjects.h>
+#include  <model_rec2/FindObjects.h>
 #include <Eigen/Geometry>
-#include <pcl/recognition/obj_rec_ransac.h>
 
 class ModelRec
 {
@@ -72,7 +71,7 @@ private:
   std::list<UserDataPtr> user_data_list_;
   std::list<vtkPolyDataReaderPtr> readers_;
 
-  pcl::recognition::ObjRecRANSAC objrec_;
+  ObjRecRANSAC objrec_;
   double success_probability_;
 
   boost::mutex ready_lock_;
