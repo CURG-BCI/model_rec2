@@ -20,6 +20,8 @@
 #include <vtkTransform.h>
 #include <vtkTransformPolyDataFilter.h>
 
+#include <ros/package.h>
+
 
 
 //#define HAO
@@ -223,7 +225,9 @@ ModelRec::loadModels()
             UserDataPtr userData(new UserData());
             userData->setLabel(s.c_str());
             // Load the model
-            sprintf(fileName, ("/home/armuser/ros/rosbuild_src/model_rec/Recognition/data/" + s + ".vtk").c_str());
+			//filename = ros::package::getPath(model_rec2);
+            //sprintf(fileName, ("/home/armuser/ros/rosbuild_src/model_rec/Recognition/data/" + s + ".vtk").c_str());
+			sprintf(fileName, (ros::package::getPath("model_rec2") + "/Recognition/data/" + s + ".vtk").c_str());
             vtkPolyDataReaderPtr reader(vtkPolyDataReader::New());
             reader->SetFileName(fileName);
             reader->Update();

@@ -16,7 +16,8 @@ find_package(catkin REQUIRED COMPONENTS
 	roscpp 
 	pcl
 	pcl_ros
-	eigen_conversions)
+	eigen_conversions
+	roslib)
 
 
 
