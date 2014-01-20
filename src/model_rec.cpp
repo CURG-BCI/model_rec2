@@ -1,13 +1,16 @@
 #include "model_rec.h"
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
+
+#include <eigen_conversions/eigen_msg.h>
+
 #include <pcl_ros/transforms.h>
 #include <pcl/registration/transforms.h>
 #include <pcl_ros/filters/filter.h>
-#include <geometry_msgs/Pose.h>
-#include <eigen_conversions/eigen_msg.h>
-#include <sensor_msgs/PointCloud2.h>
 #include <pcl_ros/filters/statistical_outlier_removal.h>
+
+#include <geometry_msgs/Pose.h>
+#include <sensor_msgs/PointCloud2.h>
 
 #include <VtkBasics/VtkWindow.h>
 #include <vtkPolyData.h>
@@ -16,15 +19,12 @@
 #include <VtkBasics/VtkPolyData.h>
 #include <VtkBasics/VtkPoints.h>
 #include <vtkPoints.h>
-
 #include <vtkTransform.h>
 #include <vtkTransformPolyDataFilter.h>
 
 #include <ros/package.h>
 
 
-
-//#define HAO
 
 void visualize(list<PointSetShape*>& detectedShapes, vtkPoints* scene, vtkPoints* background);
 
@@ -34,29 +34,10 @@ ModelRec::ModelRec(ros::NodeHandle* n, std::string pcl_pointcloud_channel, doubl
   srv_recognizeScene = n_->advertiseService("recognize_objects", &ModelRec::runRecognitionCallback, this);
 
   model_list_.push_back("all");
-        model_list_.push_back("garnier_shampoo_bottle");
-         model_list_.push_back("gillette_shaving_gel");
-     model_list_.push_back("darpaflashlight");
-  // model_list_.push_back("milk_carton");
+  model_list_.push_back("garnier_shampoo_bottle");
+  model_list_.push_back("gillette_shaving_gel");
+  model_list_.push_back("darpaflashlight");
   
-#ifdef HAO
-  model_list_.clear();
-  //model_list_.push_back("snapple");
-  //model_list_.push_back("box"); 
-  model_list_.push_back("all");
-  //model_list_.push_back("darparock");
-  //model_list_.push_back("library_cup");
-
-  //model_list_.push_back("gillette_shaving_gel");
-  //model_list_.push_back("garnier_shampoo_bottle");
-
-  //model_list_.push_back("darpaphonehandset_1000_different_coordinate_system");
-  //model_list_.push_back("mug_custom");
-  //model_list_.push_back("drill_custom");
-  //model_list_.push_back("darparock");
-  //model_list_.push_back("darpacanteen");
-  
-#endif
   
   loadModels();
   objrec_.setVisibility(0.1);
@@ -68,8 +49,7 @@ ModelRec::ModelRec(ros::NodeHandle* n, std::string pcl_pointcloud_channel, doubl
 /*@brief - Update internal pcl pointcloud by listening to point cloud stream
   
  */
-bool
-ModelRec::beginUpdatePCLPointCloud()
+bool ModelRec::beginUpdatePCLPointCloud()
 {
 
   ROS_INFO("Entering begin update\n");
@@ -97,8 +77,7 @@ processing.
 
  */
 
-void
-ModelRec::cloudQueuingCallback(const PointCloud::ConstPtr& msg)
+void ModelRec::cloudQueuingCallback(const PointCloud::ConstPtr& msg)
 {
 
   PointCloudPtr cloud_NaN_filtered (new pcl::PointCloud<pcl::PointXYZ>), cloud_outlier_filtered (new pcl::PointCloud<pcl::PointXYZ>);
@@ -143,8 +122,7 @@ FIXME - Consider doing post processing steps here.
 */
 
 
-bool
-ModelRec::updatePCLPointCloud()
+bool ModelRec::updatePCLPointCloud()
 {
   ROS_INFO("concatenating cloud\n");
   //Set new pointcloud header. Pointclouds with different headers cannot be
@@ -177,8 +155,7 @@ bool ModelRec::updateVTKFromPCLCloud(){
 }
 
 
-bool 
-ModelRec::updateCloud()
+bool ModelRec::updateCloud()
 {
     ROS_INFO("updating all clouds\n");
     updatePCLPointCloud();
