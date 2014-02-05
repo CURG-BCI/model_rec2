@@ -14,7 +14,6 @@ find_package(catkin REQUIRED COMPONENTS
 	sensor_msgs 
 	message_generation 
 	roscpp 
-	pcl
 	pcl_ros
 	eigen_conversions
 	roslib)
