@@ -1,5 +1,11 @@
+
+sensor_msgs/PointCloud2 search_cloud
+string[] model_hypotheses
+
 ---
+
 string[] object_name
 geometry_msgs/Pose[] object_pose
 string reason
 sensor_msgs/PointCloud2[] pointcloud
+

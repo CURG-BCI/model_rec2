@@ -1,0 +1,3 @@
+sensor_msgs/PointCloud2 search_cloud
+---
+string[] model_hypotheses

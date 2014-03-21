@@ -1,0 +1,8 @@
+<launch>
+<node name="debug_modelrec" type="ObjRecRANSACRun" pkg="model_rec2" launch-prefix="gdb -ex run --args" />
+  <include file="$(find openni_launch)/launch/openni.launch"></include>
+
+   <include file="$(find scene_segmenter)/launch/scene_segmenter.launch"></include>
+  
+  <node name="model_hypothesis_gen" pkg="model_hypothesis_gen" type="model_hypothesis_gen_server.py"/>
+</launch>

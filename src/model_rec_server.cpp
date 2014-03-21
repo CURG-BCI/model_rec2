@@ -7,7 +7,7 @@ int main(int argc, char ** argv)
   std::string cloud_topic = "/filtered_pc";
   n.getParam("cloud_topic", cloud_topic);
   std::cout << cloud_topic <<  "\n";
-  //ModelRec m(&n, "/camera/depth_registered/points");
+  
   ModelRec m(&n, cloud_topic);
 
 

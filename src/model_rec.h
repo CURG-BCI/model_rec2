@@ -47,39 +47,21 @@ public:
 private:  
   ros::NodeHandle *n_;
   ros::ServiceServer srv_recognizeScene;   
-  bool updateCloud();
-  bool updatePCLPointCloud();
-  bool beginUpdatePCLPointCloud();
-  bool updateVTKFromPCLCloud();
-  PointCloudPtr pcl_point_cloud_;
-  vtkSmartPointer<vtkPoints> vtk_cloud_ptr_;
-  vtkSmartPointer<vtkPoints> foreground_vtk_cloud_ptr_;
-  vtkSmartPointer<vtkPoints> background_vtk_cloud_ptr_;
-  
+
   std::vector<std::string> model_list_;
 
-  std::string pcl_pointcloud_channel_;
-  ros::Subscriber pcl_pointcloud_sub_;
-  unsigned int max_cloud_queue_size;
-  std::vector<PointCloudConstPtr> cloud_queue;
-  void cloudQueuingCallback(const PointCloud::ConstPtr& msg);
-  
-  bool loadModels();
-  /*Plane thickness is in meters here */
-  bool removePlane( double plane_thickness = .015, double rel_num_of_plane_points = 0.2)  ;
-     
+  void loadModels(ObjRecRANSAC objrec_);
+
   std::list<UserDataPtr> user_data_list_;
   std::list<vtkPolyDataReaderPtr> readers_;
 
-  ObjRecRANSAC objrec_;
   double success_probability_;
 
-  boost::mutex ready_lock_;
-  bool vtk_point_cloud_ready_;
   std::list<PointSetShape*> detected_shapes_;
   std::list<vtkPolyDataPtr> scaled_shape_clouds_;
   
   PointCloudPtr loadPointCloudFromPointShape(PointSetShape * shape);
+  vtkSmartPointer<vtkPoints> convertPointCloudToVtk(sensor_msgs::PointCloud2 rosInputCloud);
  public:
   /*pair width and voxel size are in meters here */
   ModelRec(ros::NodeHandle* n, std::string pcl_pointcloud_channel, double pair_width = .015, double voxel_size = .004);
