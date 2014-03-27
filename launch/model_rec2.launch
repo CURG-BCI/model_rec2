@@ -1,0 +1,3 @@
+<launch>
+  <node name="model_rec2" pkg="model_rec2" type="ObjRecRANSACRun" /> 
+</launch>

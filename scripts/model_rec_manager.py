@@ -1,8 +1,9 @@
 
 import roslib
 roslib.load_manifest( "model_rec2" )
+
 import rospy
-from numpy import pi, eye, dot, cross, linalg, sqrt, ceil, size, hstack, vstack, mat, array, arange, fabs
+import numpy as np
 
 import tf
 import tf.transformations
@@ -16,41 +17,27 @@ import geometry_msgs.msg
 import std_msgs.msg
 import perception_msgs.msg
 
-unique_model_name_postfix = 0
-
-def get_unique_model_name_post_fix():
-    unique_model_name_postfix += 1
-    return unique_model_name_postfix
-
 
 class Model( object ):
-    def __init__(self, model_name, point_cloud_data, pose):
-        self.model_name = model_name + get_unique_model_name_post_fix()
-        self.object_name = model_name
-        self.point_cloud_data = point_cloud_data
+    def __init__(self, model_name, object_name, point_cloud, pose, bc, listener):
+        self.model_name = model_name
+        self.object_name = object_name
+        self.point_cloud = point_cloud
         self.pose = pose
-        self.bc = ModelRecManager.tf_broadcaster
-        self.listener = ModelRecManager.tf_listener
+        self.bc = bc
+        self.listener = listener
         
+    
     def broadcast_tf(self):
         tf_pose = pm.toTf(pm.fromMsg(self.pose))
         self.bc.sendTransform(tf_pose[0], tf_pose[1], rospy.Time.now(), self.object_name, "/camera_rgb_optical_frame")
             
-    def get_dist(self):
-        self.broadcast_tf()
-        self.listener.waitForTransform("/world", self.object_name, rospy.Time(0),rospy.Duration(10))
-        (trans, rot) = self.listener.lookupTransform("/world",self.object_name, rospy.Time(0))
-        return linalg.norm(trans)
-    
     def get_world_pose(self):
         self.broadcast_tf()
-        self.listener.waitForTransform("/world", self.object_name, rospy.Time(0),rospy.Duration(10))            
-        return pm.toMsg(pm.fromTf(self.listener.lookupTransform("/world",self.object_name, rospy.Time(0))))
+        self.listener.waitForTransform("/camera_depth_frame", self.object_name, rospy.Time(0),rospy.Duration(10))            
+        return pm.toMsg(pm.fromTf(self.listener.lookupTransform("/camera_depth_frame", self.object_name, rospy.Time(0))))
 
-        
-
-
-
+      
 class ModelRecManager( object ):                  
             
     def __init__(self):
@@ -69,8 +56,13 @@ class ModelRecManager( object ):
         self.object_pointcloud_pub = rospy.Publisher('/object_pointcloud',sensor_msgs.msg.PointCloud2) 
         
         self.find_objects_srv = rospy.ServiceProxy('/recognize_objects', model_rec2.srv.FindObjects)
-        self.gen_hypotheses_srv = rospy.ServiceProxy('/gen_hypotheses', model_rec2.srv.GenHypotheses)
-    
+
+        self.unique_model_name_postfix = 0
+     
+    def get_unique_model_name_post_fix(self):
+        self.unique_model_name_postfix += 1
+        return self.unique_model_name_postfix
+
     #this is called whenever a new set of segmented objects is published
     def segmented_objects_list_callback(self, segmented_objects_list):
         self.segmented_objects_list = segmented_objects_list
@@ -86,35 +78,26 @@ class ModelRecManager( object ):
 
         #for each segmented object, find the matching models
         for segmented_object in current_segmented_objects_list.segmentedObjects:
-            hypotheses = self.gen_hypotheses_srv(segmented_object.segmentedObjectPointCloud)
-            found_object_resp = self.find_objects_srv(segmented_object.segmentedObjectPointCloud,hypotheses.model_hypotheses)
+            found_object_resp = self.find_objects_srv(segmented_object.segmentedObjectPointCloud)
 
-            #for each model found, add it to the model list
-            for i in range(len(found_object_resp.object_name)):
-
-                object_pose = found_object_resp.object_pose[i]
-                object_name = found_object_resp.object_name[i]
-                pointcloud = found_object_resp.pointcloud[i]
-
-                model = Model(object_name,pointcloud,object_pose)
-
+            if found_object_resp.object_name:
+                model = Model(
+                    model_name  = found_object_resp.object_name,
+                    object_name = found_object_resp.object_name + str(self.get_unique_model_name_post_fix()),
+                    point_cloud = found_object_resp.pointcloud,
+                    pose = found_object_resp.object_pose,
+                    bc = self.tf_broadcaster,
+                    listener = self.tf_listener,
+                )
                 self.model_list.append(model)
 
-
     def publish_closest_model(self):
-        self.model_list.sort(key=Model.get_dist)
-        closest_model = self.model_list[0]
-        closest_model.broadcast_tf()
-        closest_model.get_world_pose()
-        self.object_pointcloud_pub.publish(closest_model.point_cloud_data)
+        for model in self.model_list:
+            closest_model = model
+            closest_model.get_world_pose()
+            closest_model.point_cloud.header.frame_id = closest_model.object_name
+            self.object_pointcloud_pub.publish(closest_model.point_cloud)
         
 print "call model_rec_manager = ModelRecManager()"
 print "call model_rec_manager.run_model_rec() to run recognition"
 print "call model_rec_manager.publish_closest_model() to publish best result" 
-
-
-
-
-
-        
-

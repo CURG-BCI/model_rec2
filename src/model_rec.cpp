@@ -32,10 +32,21 @@
 void visualize(list<PointSetShape*>& detectedShapes, vtkPoints* scene, vtkPoints* background);
 
 ModelRec::ModelRec(ros::NodeHandle* n, std::string pcl_pointcloud_channel, double pair_width, double voxel_size):
- n_(n),
- success_probability_(0.99) 
+    n_(n),
+    objrec_(pair_width, voxel_size, 0.5),
+    success_probability_(0.99) 
 {
     srv_recognizeScene = n_->advertiseService("recognize_objects", &ModelRec::runRecognitionCallback, this);
+
+    model_list_.push_back("all");
+    model_list_.push_back("garnier_shampoo_bottle");
+    model_list_.push_back("gillette_shaving_gel");
+    model_list_.push_back("darpaflashlight");
+
+    loadModels();
+    objrec_.setVisibility(0.1);
+    objrec_.setRelativeObjectSize(0.1);
+    objrec_.setNumberOfThreads(4);  
 }
 
 
@@ -60,7 +71,7 @@ vtkSmartPointer<vtkPolyData> scale_vtk_model(vtkSmartPointer<vtkPolyData> & m, d
 }
 
 
-void ModelRec::loadModels(ObjRecRANSAC objrec_)
+void ModelRec::loadModels()
 {
         char fileName[1024];
         // Derive the class 'UserData' if you want to save some specific information
@@ -124,69 +135,60 @@ vtkSmartPointer<vtkPoints> ModelRec::convertPointCloudToVtk(sensor_msgs::PointCl
 
 bool ModelRec::runRecognitionCallback(model_rec2::FindObjects::Request & req, model_rec2::FindObjects::Response & res)
 {
-  ROS_INFO("Entering callback\n");
+    ROS_INFO("Entering callback\n");
 
-  ObjRecRANSAC *objrec_ = new ObjRecRANSAC(.015, .004, 0.5);
-  objrec_->setVisibility(0.1);
-  objrec_->setRelativeObjectSize(0.1);
-  objrec_->setNumberOfThreads(4);
+    vtkSmartPointer<vtkPoints> vtkInputCloud = convertPointCloudToVtk(req.search_cloud);
 
-  model_list_.clear();
+    ROS_INFO("finished load models\n");
+    objrec_.doRecognition(vtkInputCloud, success_probability_, detected_shapes_);
 
-  vtkSmartPointer<vtkPoints> vtkInputCloud = convertPointCloudToVtk(req.search_cloud);
-  for(int i = 0; i < req.model_hypotheses.size(); i++)
-  {
-      model_list_.push_back(req.model_hypotheses.at(i));
-  }
-  ROS_INFO("started load models\n");
-  loadModels(*objrec_);
-  ROS_INFO("finished load models\n");
-  objrec_->doRecognition(vtkInputCloud, success_probability_, detected_shapes_);
-  
 
-//  ROS_INFO("Number of shapes: %i\n", detected_shapes_.size());
+    ROS_INFO("Number of shapes: %i\n", detected_shapes_.size());
 
-////  //process detected shapes and add them to response message
-////  BOOST_FOREACH(PointSetShape * shape, detected_shapes_){
+    //process detected shapes and add them to response message
 
-////    //Transform linear shape matrix to pose message
-////    //FIXME this could definitely be more elegant
-////    geometry_msgs::Pose shape_pose_msg;
-////    Eigen::Affine3d shape_pose;
-////    shape_pose.setIdentity();
-////    const double *mat4x4 = shape->getRigidTransform();
-    
-////    //Stupid helper function to go from linear 4x4 to Eigen Affine3D
-////    eigenFromCArray(mat4x4, shape_pose);
-////    //Stupid helper to go from eigen to pose message
-////    //FIXME: WARNING - this api is not the one that was documented
-////    //it may be deprecated in favor of a different Eigen structure
-////    //such as Eigen::Transform or Eigen2something
-////    tf::poseEigenToMsg(shape_pose, shape_pose_msg);
+    if (detected_shapes_.size())
+    {
+        PointSetShape *shape = detected_shapes_.front();
 
-////    //Print some basic information about detected shapes
-////    std::cout << "Shape name " << shape->getUserData()->getLabel() << "\n"
-////              << "Transform " << shape_pose_msg << "\n";
+        //Transform linear shape matrix to pose message
+        //FIXME this could definitely be more elegant
+        geometry_msgs::Pose shape_pose_msg;
+        Eigen::Affine3d shape_pose;
+        shape_pose.setIdentity();
+        const double *mat4x4 = shape->getRigidTransform();
 
-////    //store the detected shapes and poses.
-////    //FIXME - These should be bundled together in a "localized_object" structure
-////    //instead of implicitly matching them by index in their relative vectors.
-////    res.object_name.push_back(std::string(shape->getUserData()->getLabel()));
-////    res.object_pose.push_back(shape_pose_msg);
+        //Stupid helper function to go from linear 4x4 to Eigen Affine3D
+        eigenFromCArray(mat4x4, shape_pose);
+        //Stupid helper to go from eigen to pose message
+        //FIXME: WARNING - this api is not the one that was documented
+        //it may be deprecated in favor of a different Eigen structure
+        //such as Eigen::Transform or Eigen2something
+        tf::poseEigenToMsg(shape_pose, shape_pose_msg);
 
-////    //Get complete point cloud for matched object
-////    PointCloudPtr pc = loadPointCloudFromPointShape(shape);
-////    pc->header.frame_id = shape->getUserData()->getLabel();
-////    sensor_msgs::PointCloud2 p;
-////    pcl::toROSMsg(*pc, p);
-////    res.pointcloud.push_back(p);
-////    delete shape;
-////  }
-//  ROS_INFO("DONE");
+        //Print some basic information about detected shapes
+        std::cout << "Shape name " << shape->getUserData()->getLabel() << "\n"
+        << "Transform " << shape_pose_msg << "\n";
 
-//  detected_shapes_.clear();
-//  delete objrec_;
-  return true;
+        //store the detected shapes and poses.
+        //FIXME - These should be bundled together in a "localized_object" structure
+        //instead of implicitly matching them by index in their relative vectors.
+        res.object_name = std::string(shape->getUserData()->getLabel());
+        res.object_pose = shape_pose_msg;
+
+        //Get complete point cloud for matched object
+        PointCloudPtr pc = loadPointCloudFromPointShape(shape);
+        pc->header.frame_id = shape->getUserData()->getLabel();
+        sensor_msgs::PointCloud2 p;
+        pcl::toROSMsg(*pc, p);
+        res.pointcloud = p;
+        delete shape;
+    }
+
+    ROS_INFO("DONE");
+
+    detected_shapes_.clear();
+    return true;
 }
 
 

@@ -50,11 +50,13 @@ private:
 
   std::vector<std::string> model_list_;
 
-  void loadModels(ObjRecRANSAC objrec_);
+
+  void loadModels();
 
   std::list<UserDataPtr> user_data_list_;
   std::list<vtkPolyDataReaderPtr> readers_;
 
+  ObjRecRANSAC objrec_;
   double success_probability_;
 
   std::list<PointSetShape*> detected_shapes_;
