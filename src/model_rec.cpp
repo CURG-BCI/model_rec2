@@ -36,7 +36,7 @@ ModelRec::ModelRec(ros::NodeHandle* n, std::string pcl_pointcloud_channel, doubl
   model_list_.push_back("all");
   model_list_.push_back("garnier_shampoo_bottle");
   model_list_.push_back("gillette_shaving_gel");
-  model_list_.push_back("darpaflashlight");
+  //model_list_.push_back("darpaflashlight");
   
   
   loadModels();
@@ -97,7 +97,7 @@ void ModelRec::cloudQueuingCallback(const PointCloud::ConstPtr& msg)
   pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
   sor.setInputCloud (cloud_NaN_filtered);
   sor.setMeanK (50);
-  sor.setStddevMulThresh (1.0);
+  sor.setStddevMulThresh (3.0);
   sor.filter (*cloud_outlier_filtered);
   
   cloud_queue.push_back(cloud_outlier_filtered);
@@ -269,7 +269,7 @@ ModelRec::runRecognitionCallback(model_rec2::FindObjects::Request & req, model_r
       ros::spinOnce();
     }
   ROS_INFO("Finished acquiring images\n");
-  if(1){
+  if(0){
     removePlane();
     objrec_.doRecognition(foreground_vtk_cloud_ptr_, success_probability_, detected_shapes_);
   }
